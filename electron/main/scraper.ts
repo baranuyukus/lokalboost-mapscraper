@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import { ipcMain, BrowserWindow, app } from 'electron';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { Place, ScraperOptions, SelectedLocation, ScraperProgress } from '../../src/types/scraper';
 
 // ============================================
@@ -96,6 +97,10 @@ class GoogleEarthClient {
 
     constructor(proxy: string | null = null) {
         this.cookie = generatePseudoCookie();
+
+        // Proxy agent oluştur (https-proxy-agent ile tunnel)
+        const proxyAgent = proxy ? this.createProxyAgent(proxy) : undefined;
+
         this.httpClient = axios.create({
             timeout: 30000,
             headers: {
@@ -110,37 +115,20 @@ class GoogleEarthClient {
                 'Cookie': this.cookie,
                 'X-Goog-Encode-Response-If-Executable': 'base64',
             },
-            ...(proxy ? { proxy: this.parseProxy(proxy) } : {}),
+            // https-proxy-agent kullan (axios proxy KULLANMA)
+            proxy: false,
+            ...(proxyAgent ? { httpAgent: proxyAgent, httpsAgent: proxyAgent } : {}),
         });
     }
 
-    private parseProxy(proxyStr: string) {
-        try {
-            // DataImpulse vb. formatlar: user:pass@host:port
-            // URL parse bazen credential'lardaki özel karakterlerle bozulabilir
-            // Regex ile parse et
-            const match = proxyStr.match(/^(?:https?:\/\/)?(?:(.+):(.+)@)?([^:]+):(\d+)$/);
-            if (match) {
-                const [, username, password, host, port] = match;
-                return {
-                    host,
-                    port: parseInt(port),
-                    protocol: 'http',
-                    ...(username ? { auth: { username: decodeURIComponent(username), password: decodeURIComponent(password || '') } } : {}),
-                };
-            }
-            // Fallback: standart URL parse
-            const url = new URL(proxyStr.startsWith('http') ? proxyStr : `http://${proxyStr}`);
-            return {
-                host: url.hostname,
-                port: parseInt(url.port) || 80,
-                protocol: url.protocol.replace(':', ''),
-                ...(url.username ? { auth: { username: decodeURIComponent(url.username), password: decodeURIComponent(url.password) } } : {}),
-            };
-        } catch (err) {
-            console.error(`[Proxy] Parse error for: ${proxyStr}`, err);
-            return undefined;
+    /** Proxy URL'den agent oluştur */
+    private createProxyAgent(proxyStr: string): HttpsProxyAgent<string> {
+        // URL'i normalize et: http:// prefix yoksa ekle
+        let url = proxyStr.trim();
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            url = `http://${url}`;
         }
+        return new HttpsProxyAgent(url);
     }
 
     /** Rotate headers for each request to look like different sessions */
@@ -426,33 +414,26 @@ class ScraperManager {
     /** Proxy bağlantı testi */
     private async testProxy(proxyUrl: string): Promise<{ success: boolean; ip?: string; message: string }> {
         try {
-            const client = new GoogleEarthClient(proxyUrl);
-            // basit bir IP kontrol servisi ile test et
+            // Proxy URL normalize
+            let url = proxyUrl.trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = `http://${url}`;
+            }
+            const agent = new HttpsProxyAgent(url);
             const testAxios = axios.create({
                 timeout: 15000,
-                ...(proxyUrl ? { proxy: this.parseProxyUrl(proxyUrl) } : {}),
+                proxy: false,
+                httpAgent: agent,
+                httpsAgent: agent,
             });
             const res = await testAxios.get('https://api.ipify.org?format=json');
             const ip = res.data?.ip || 'unknown';
-            console.log(`[Proxy Test] \u2705 Ba\u015far\u0131l\u0131 - IP: ${ip}`);
-            return { success: true, ip, message: `Ba\u011flant\u0131 ba\u015far\u0131l\u0131! IP: ${ip}` };
+            console.log(`[Proxy Test] ✅ Başarılı - IP: ${ip}`);
+            return { success: true, ip, message: `Bağlantı başarılı! IP: ${ip}` };
         } catch (err: any) {
-            console.error(`[Proxy Test] \u274c Ba\u015far\u0131s\u0131z:`, err.message);
-            return { success: false, message: `Ba\u011flant\u0131 ba\u015far\u0131s\u0131z: ${err.message}` };
+            console.error(`[Proxy Test] ❌ Başarısız:`, err.message);
+            return { success: false, message: `Bağlantı başarısız: ${err.message}` };
         }
-    }
-
-    /** Proxy URL'ini axios proxy format\u0131na \u00e7evir */
-    private parseProxyUrl(proxyStr: string) {
-        const match = proxyStr.match(/^(?:https?:\/\/)?(?:(.+):(.+)@)?([^:]+):(\d+)$/);
-        if (match) {
-            const [, username, password, host, port] = match;
-            return {
-                host, port: parseInt(port), protocol: 'http' as const,
-                ...(username ? { auth: { username: decodeURIComponent(username), password: decodeURIComponent(password || '') } } : {}),
-            };
-        }
-        return undefined;
     }
 
     private async start(options: ScraperOptions) {
