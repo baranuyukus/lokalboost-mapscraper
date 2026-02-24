@@ -116,14 +116,31 @@ class GoogleEarthClient {
 
     private parseProxy(proxyStr: string) {
         try {
-            const url = new URL(proxyStr);
+            // DataImpulse vb. formatlar: user:pass@host:port
+            // URL parse bazen credential'lardaki özel karakterlerle bozulabilir
+            // Regex ile parse et
+            const match = proxyStr.match(/^(?:https?:\/\/)?(?:(.+):(.+)@)?([^:]+):(\d+)$/);
+            if (match) {
+                const [, username, password, host, port] = match;
+                return {
+                    host,
+                    port: parseInt(port),
+                    protocol: 'http',
+                    ...(username ? { auth: { username: decodeURIComponent(username), password: decodeURIComponent(password || '') } } : {}),
+                };
+            }
+            // Fallback: standart URL parse
+            const url = new URL(proxyStr.startsWith('http') ? proxyStr : `http://${proxyStr}`);
             return {
                 host: url.hostname,
-                port: parseInt(url.port),
+                port: parseInt(url.port) || 80,
                 protocol: url.protocol.replace(':', ''),
-                ...(url.username ? { auth: { username: url.username, password: url.password } } : {}),
+                ...(url.username ? { auth: { username: decodeURIComponent(url.username), password: decodeURIComponent(url.password) } } : {}),
             };
-        } catch { return undefined; }
+        } catch (err) {
+            console.error(`[Proxy] Parse error for: ${proxyStr}`, err);
+            return undefined;
+        }
     }
 
     /** Rotate headers for each request to look like different sessions */
@@ -403,6 +420,39 @@ class ScraperManager {
     registerHandlers() {
         ipcMain.handle('scraper:start', async (_, options: ScraperOptions) => this.start(options));
         ipcMain.handle('scraper:stop', () => this.stop());
+        ipcMain.handle('scraper:testProxy', async (_, proxyUrl: string) => this.testProxy(proxyUrl));
+    }
+
+    /** Proxy bağlantı testi */
+    private async testProxy(proxyUrl: string): Promise<{ success: boolean; ip?: string; message: string }> {
+        try {
+            const client = new GoogleEarthClient(proxyUrl);
+            // basit bir IP kontrol servisi ile test et
+            const testAxios = axios.create({
+                timeout: 15000,
+                ...(proxyUrl ? { proxy: this.parseProxyUrl(proxyUrl) } : {}),
+            });
+            const res = await testAxios.get('https://api.ipify.org?format=json');
+            const ip = res.data?.ip || 'unknown';
+            console.log(`[Proxy Test] \u2705 Ba\u015far\u0131l\u0131 - IP: ${ip}`);
+            return { success: true, ip, message: `Ba\u011flant\u0131 ba\u015far\u0131l\u0131! IP: ${ip}` };
+        } catch (err: any) {
+            console.error(`[Proxy Test] \u274c Ba\u015far\u0131s\u0131z:`, err.message);
+            return { success: false, message: `Ba\u011flant\u0131 ba\u015far\u0131s\u0131z: ${err.message}` };
+        }
+    }
+
+    /** Proxy URL'ini axios proxy format\u0131na \u00e7evir */
+    private parseProxyUrl(proxyStr: string) {
+        const match = proxyStr.match(/^(?:https?:\/\/)?(?:(.+):(.+)@)?([^:]+):(\d+)$/);
+        if (match) {
+            const [, username, password, host, port] = match;
+            return {
+                host, port: parseInt(port), protocol: 'http' as const,
+                ...(username ? { auth: { username: decodeURIComponent(username), password: decodeURIComponent(password || '') } } : {}),
+            };
+        }
+        return undefined;
     }
 
     private async start(options: ScraperOptions) {

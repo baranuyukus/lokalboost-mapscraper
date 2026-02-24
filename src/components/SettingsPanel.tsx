@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 import type { ProxyConfig, AutoSaveConfig, FilterConfig } from '../types/scraper';
 
@@ -17,8 +17,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     isOpen, onClose, proxy, onProxyChange, autoSave, onAutoSaveChange, filters, onFiltersChange,
 }) => {
     const { t } = useLanguage();
+    const [proxyTesting, setProxyTesting] = useState(false);
+    const [proxyTestResult, setProxyTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
     if (!isOpen) return null;
+
+    const handleProxyTest = async (proxyUrl: string) => {
+        setProxyTesting(true);
+        setProxyTestResult(null);
+        try {
+            const result = await window.ipcRenderer.invoke('scraper:testProxy', proxyUrl);
+            setProxyTestResult(result);
+        } catch (err: any) {
+            setProxyTestResult({ success: false, message: err.message });
+        } finally {
+            setProxyTesting(false);
+        }
+    };
 
     const sectionStyle: React.CSSProperties = {
         padding: '16px 20px',
@@ -159,10 +174,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                 <input
                                     className="input-premium"
                                     value={proxy.rotatingProxy}
-                                    onChange={e => onProxyChange({ ...proxy, rotatingProxy: e.target.value })}
+                                    onChange={e => { onProxyChange({ ...proxy, rotatingProxy: e.target.value }); setProxyTestResult(null); }}
                                     placeholder={t.settings.proxyRotatingPlaceholder}
                                     style={{ fontFamily: 'var(--font-data)', fontSize: 11 }}
                                 />
+                                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <button
+                                        className="btn-premium"
+                                        disabled={proxyTesting || !proxy.rotatingProxy.trim()}
+                                        onClick={() => handleProxyTest(proxy.rotatingProxy)}
+                                        style={{ padding: '4px 12px', fontSize: 11 }}
+                                    >
+                                        {proxyTesting ? '⏳ Test...' : '🔌 Test Proxy'}
+                                    </button>
+                                    {proxyTestResult && (
+                                        <span style={{ fontSize: 10, color: proxyTestResult.success ? '#22c55e' : '#ef4444' }}>
+                                            {proxyTestResult.message}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -172,13 +202,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                 <textarea
                                     className="input-premium"
                                     value={proxy.stickyProxies.join('\n')}
-                                    onChange={e => onProxyChange({ ...proxy, stickyProxies: e.target.value.split('\n').filter(l => l.trim()) })}
+                                    onChange={e => { onProxyChange({ ...proxy, stickyProxies: e.target.value.split('\n').filter(l => l.trim()) }); setProxyTestResult(null); }}
                                     placeholder={t.settings.proxyStickyPlaceholder}
                                     style={{ height: 80, fontFamily: 'var(--font-data)', fontSize: 11, resize: 'vertical' }}
                                 />
-                                <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-                                    {t.settings.proxyStickyHelp} • {proxy.stickyProxies.length} proxy
-                                </p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                                    <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0 }}>
+                                        {t.settings.proxyStickyHelp} • {proxy.stickyProxies.length} proxy
+                                    </p>
+                                    {proxy.stickyProxies.length > 0 && (
+                                        <button
+                                            className="btn-premium"
+                                            disabled={proxyTesting}
+                                            onClick={() => handleProxyTest(proxy.stickyProxies[0])}
+                                            style={{ padding: '4px 12px', fontSize: 11 }}
+                                        >
+                                            {proxyTesting ? '⏳ Test...' : '🔌 Test'}
+                                        </button>
+                                    )}
+                                </div>
+                                {proxyTestResult && (
+                                    <p style={{ fontSize: 10, marginTop: 4, color: proxyTestResult.success ? '#22c55e' : '#ef4444' }}>
+                                        {proxyTestResult.message}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
