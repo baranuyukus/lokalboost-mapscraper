@@ -20,12 +20,6 @@
       "dist",
       "dist-electron"
     ],
-    "extraResources": [
-      {
-        "from": ".env",
-        "to": ".env"
-      }
-    ],
     "asar": true,
     "mac": {
       "target": "dmg",

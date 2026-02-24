@@ -1,11 +1,6 @@
 import axios from 'axios';
 import { machineId } from 'node-machine-id';
 import { ipcMain, BrowserWindow } from 'electron';
-import * as dotenv from 'dotenv';
-import { join } from 'path';
-
-// Load environment variables BEFORE using them
-dotenv.config({ path: join(process.cwd(), '.env') });
 
 const API_URL = 'https://keyauth.win/api/1.3/';
 
@@ -23,11 +18,11 @@ const state: AuthState = {
     user: null,
 };
 
-// Env vars are injected by Vite at build time via process.env
+// Hardcoded KeyAuth credentials
 const CONFIG = {
-    name: process.env.VITE_KEYAUTH_NAME || '',
-    ownerId: process.env.VITE_KEYAUTH_OWNERID || '',
-    version: process.env.VITE_KEYAUTH_VERSION || '1.0',
+    name: 'LokalBoost Maps Scraper',
+    ownerId: 'lA8BGZPg7n',
+    version: '1.0',
 };
 
 console.log('--- KeyAuth Config Loaded ---');
