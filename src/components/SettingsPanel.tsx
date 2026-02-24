@@ -264,6 +264,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.settings.autoSaveCountHelp}</span>
                             </div>
                         )}
+
+                        {/* Kayıt Klasörü */}
+                        {autoSave.mode !== 'off' && (
+                            <div className="animate-fadeIn" style={{ marginTop: 10 }}>
+                                <label style={labelStyle}>Kayıt Klasörü</label>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    <button
+                                        className="btn-ghost"
+                                        onClick={async () => {
+                                            const folder = await window.ipcRenderer.invoke('scraper:selectFolder');
+                                            if (folder) onAutoSaveChange({ ...autoSave, savePath: folder });
+                                        }}
+                                        style={{ padding: '4px 10px', fontSize: 11, whiteSpace: 'nowrap' }}
+                                    >
+                                        📂 Klasör Seç
+                                    </button>
+                                    <span style={{
+                                        fontSize: 10, color: 'var(--text-muted)',
+                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                        direction: 'rtl', textAlign: 'left',
+                                    }}>
+                                        {autoSave.savePath || 'Desktop (varsayılan)'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* ═══ FILTERS ═══ */}

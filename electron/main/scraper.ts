@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import * as cheerio from 'cheerio';
-import { ipcMain, BrowserWindow, app } from 'electron';
+import { ipcMain, BrowserWindow, app, dialog } from 'electron';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -409,6 +409,11 @@ class ScraperManager {
         ipcMain.handle('scraper:start', async (_, options: ScraperOptions) => this.start(options));
         ipcMain.handle('scraper:stop', () => this.stop());
         ipcMain.handle('scraper:testProxy', async (_, proxyUrl: string) => this.testProxy(proxyUrl));
+        ipcMain.handle('scraper:selectFolder', async () => {
+            const result = await dialog.showOpenDialog({ properties: ['openDirectory'], title: 'Auto-Save Klasörü Seç' });
+            if (result.canceled || !result.filePaths.length) return null;
+            return result.filePaths[0];
+        });
     }
 
     /** Proxy bağlantı testi */
@@ -697,17 +702,18 @@ class ScraperManager {
         this.currentLabel = label;
 
         if (shouldSave) {
-            this.saveCSV(suffix);
+            this.saveCSV(suffix, options.autoSave.savePath);
             this.lastAutoSaveCount = this.allResults.length;
         }
     }
 
     /** CSV dosyası kaydet */
-    private saveCSV(suffix: string = '') {
+    private saveCSV(suffix: string = '', savePath?: string) {
         try {
             const date = new Date().toISOString().slice(0, 10);
             const fileName = `scraper_${date}${suffix}.csv`;
-            const savePath = join(app.getPath('desktop'), fileName);
+            const dir = savePath && savePath.trim() ? savePath.trim() : app.getPath('desktop');
+            const fullPath = join(dir, fileName);
 
             const headers = ['Name', 'Address', 'Phone', 'Rating', 'Reviews', 'Category', 'Website', 'URL', 'Query'];
             const rows = this.allResults.map(p => [
@@ -715,10 +721,10 @@ class ScraperManager {
                 p.review_count?.toString(), p.category ?? '', p.website ?? '', p.url ?? '', p.query ?? '',
             ]);
             const csv = [headers, ...rows].map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-            writeFileSync(savePath, '\ufeff' + csv, 'utf-8');
+            writeFileSync(fullPath, '\ufeff' + csv, 'utf-8');
 
-            console.log(`[AutoSave] ${this.allResults.length} results saved to ${savePath}`);
-            this.win?.webContents.send('scraper:autosave', { path: savePath, count: this.allResults.length });
+            console.log(`[AutoSave] ${this.allResults.length} results saved to ${fullPath}`);
+            this.win?.webContents.send('scraper:autosave', { path: fullPath, count: this.allResults.length });
         } catch (err: any) {
             console.error(`[AutoSave] Error: ${err.message}`);
         }
