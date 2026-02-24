@@ -108,6 +108,9 @@ export interface Translations {
         autoSavePerCount: string;
         autoSaveCount: string;
         autoSaveCountHelp: string;
+        saveFolder: string;
+        selectFolder: string;
+        defaultDesktop: string;
         // Filters
         filterTitle: string;
         requirePhone: string;
@@ -120,6 +123,28 @@ export interface Translations {
         minReviewsHelp: string;
         // Actions
         close: string;
+    };
+    dataTable: {
+        searchPlaceholder: string;
+        allCities: string;
+        hasPhone: string;
+        hasWebsite: string;
+        sortAsc: string;
+        sortDesc: string;
+        showingOf: string;
+        // Export
+        exportTitle: string;
+        exportFiltered: string;
+        exportAll: string;
+        exportColumns: string;
+        exportFormat: string;
+        exportFileName: string;
+        exportButton: string;
+        cancel: string;
+        // Stats
+        avgRating: string;
+        withPhone: string;
+        withWebsite: string;
     };
     common: {
         required: string;
@@ -228,6 +253,9 @@ const en: Translations = {
         autoSavePerCount: 'Per Result Count',
         autoSaveCount: 'Save Every',
         autoSaveCountHelp: 'results',
+        saveFolder: 'Save Folder',
+        selectFolder: 'Select Folder',
+        defaultDesktop: 'Desktop (default)',
         filterTitle: 'Data Filters',
         requirePhone: 'Require Phone',
         requirePhoneHelp: 'Skip businesses without phone number',
@@ -238,6 +266,26 @@ const en: Translations = {
         minReviews: 'Min Reviews',
         minReviewsHelp: '0 = disabled',
         close: 'Close',
+    },
+    dataTable: {
+        searchPlaceholder: 'Search name, address, phone...',
+        allCities: 'All Cities',
+        hasPhone: 'Has Phone',
+        hasWebsite: 'Has Website',
+        sortAsc: 'Sort ascending',
+        sortDesc: 'Sort descending',
+        showingOf: 'of',
+        exportTitle: 'Export Data',
+        exportFiltered: 'Export Filtered',
+        exportAll: 'Export All',
+        exportColumns: 'Columns',
+        exportFormat: 'Format',
+        exportFileName: 'File Name',
+        exportButton: 'Export',
+        cancel: 'Cancel',
+        avgRating: 'Avg Rating',
+        withPhone: 'With Phone',
+        withWebsite: 'With Website',
     },
     common: {
         required: 'Required',
@@ -346,6 +394,9 @@ const tr: Translations = {
         autoSavePerCount: 'Sonuç Sayısına Göre',
         autoSaveCount: 'Her',
         autoSaveCountHelp: 'sonuçta kaydet',
+        saveFolder: 'Kayıt Klasörü',
+        selectFolder: 'Klasör Seç',
+        defaultDesktop: 'Masaüstü (varsayılan)',
         filterTitle: 'Veri Filtreleri',
         requirePhone: 'Telefon Zorunlu',
         requirePhoneHelp: 'Telefon numarası olmayan işletmeleri atla',
@@ -356,6 +407,26 @@ const tr: Translations = {
         minReviews: 'Min Yorum',
         minReviewsHelp: '0 = devre dışı',
         close: 'Kapat',
+    },
+    dataTable: {
+        searchPlaceholder: 'İsim, adres, telefon ara...',
+        allCities: 'Tüm Şehirler',
+        hasPhone: 'Telefonu Var',
+        hasWebsite: 'Website\'i Var',
+        sortAsc: 'Artan sırala',
+        sortDesc: 'Azalan sırala',
+        showingOf: '/',
+        exportTitle: 'Veriyi Dışa Aktar',
+        exportFiltered: 'Filtrelenmişi Aktar',
+        exportAll: 'Tümünü Aktar',
+        exportColumns: 'Sütunlar',
+        exportFormat: 'Format',
+        exportFileName: 'Dosya Adı',
+        exportButton: 'Dışa Aktar',
+        cancel: 'İptal',
+        avgRating: 'Ort. Puan',
+        withPhone: 'Telefonlu',
+        withWebsite: 'Websiteli',
     },
     common: {
         required: 'Zorunlu',

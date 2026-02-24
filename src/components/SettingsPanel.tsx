@@ -268,7 +268,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         {/* Kayıt Klasörü */}
                         {autoSave.mode !== 'off' && (
                             <div className="animate-fadeIn" style={{ marginTop: 10 }}>
-                                <label style={labelStyle}>Kayıt Klasörü</label>
+                                <label style={labelStyle}>{t.settings.saveFolder}</label>
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                     <button
                                         className="btn-ghost"
@@ -278,14 +278,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                         }}
                                         style={{ padding: '4px 10px', fontSize: 11, whiteSpace: 'nowrap' }}
                                     >
-                                        📂 Klasör Seç
+                                        📂 {t.settings.selectFolder}
                                     </button>
                                     <span style={{
                                         fontSize: 10, color: 'var(--text-muted)',
                                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                         direction: 'rtl', textAlign: 'left',
                                     }}>
-                                        {autoSave.savePath || 'Desktop (varsayılan)'}
+                                        {autoSave.savePath || t.settings.defaultDesktop}
                                     </span>
                                 </div>
                             </div>
