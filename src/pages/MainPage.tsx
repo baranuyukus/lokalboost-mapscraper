@@ -28,6 +28,7 @@ const MainPage: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [proxy, setProxy] = useState<ProxyConfig>({ mode: 'none', rotatingProxy: '', stickyProxies: [] });
     const [autoSave, setAutoSave] = useState<AutoSaveConfig>({ mode: 'off', count: 5000, savePath: '' });
     const [filters, setFilters] = useState<FilterConfig>({ requirePhone: false, requireWebsite: false, minRating: 0, minReviews: 0 });
+    const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
 
     // Load countries
     useEffect(() => {
@@ -71,10 +72,20 @@ const MainPage: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         window.ipcRenderer.on('scraper:data', handleData);
         window.ipcRenderer.on('scraper:progress', handleProgress);
         window.ipcRenderer.on('scraper:complete', handleComplete);
+
+        // Auto-save bildirimi
+        const handleAutoSave = (_e: any, data: { path: string; count: number }) => {
+            const fileName = data.path.split('/').pop() || data.path;
+            setAutoSaveToast(`💾 ${fileName} (${data.count} sonuç)`);
+            setTimeout(() => setAutoSaveToast(null), 5000);
+        };
+        window.ipcRenderer.on('scraper:autosave', handleAutoSave);
+
         return () => {
             window.ipcRenderer.removeAllListeners('scraper:data');
             window.ipcRenderer.removeAllListeners('scraper:progress');
             window.ipcRenderer.removeAllListeners('scraper:complete');
+            window.ipcRenderer.removeAllListeners('scraper:autosave');
         };
     }, []);
 
@@ -493,6 +504,18 @@ const MainPage: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 filters={filters}
                 onFiltersChange={setFilters}
             />
+
+            {/* Auto-Save Toast */}
+            {autoSaveToast && (
+                <div className="animate-fadeIn" style={{
+                    position: 'fixed', bottom: 20, right: 20, zIndex: 200,
+                    background: 'var(--success, #22c55e)', color: '#fff',
+                    padding: '10px 16px', borderRadius: 'var(--radius-lg, 8px)',
+                    fontSize: 12, fontWeight: 600, boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                }}>
+                    {autoSaveToast}
+                </div>
+            )}
         </div>
     );
 };
