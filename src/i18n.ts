@@ -86,6 +86,41 @@ export interface Translations {
         columnWebsite: string;
         columnQuery: string;
     };
+    settings: {
+        title: string;
+        // Proxy
+        proxyTitle: string;
+        proxyMode: string;
+        proxyNone: string;
+        proxyRotating: string;
+        proxySticky: string;
+        proxyRotatingUrl: string;
+        proxyRotatingPlaceholder: string;
+        proxyStickyList: string;
+        proxyStickyPlaceholder: string;
+        proxyStickyHelp: string;
+        // Auto-Save
+        autoSaveTitle: string;
+        autoSaveMode: string;
+        autoSaveOff: string;
+        autoSavePerDistrict: string;
+        autoSavePerState: string;
+        autoSavePerCount: string;
+        autoSaveCount: string;
+        autoSaveCountHelp: string;
+        // Filters
+        filterTitle: string;
+        requirePhone: string;
+        requirePhoneHelp: string;
+        requireWebsite: string;
+        requireWebsiteHelp: string;
+        minRating: string;
+        minRatingHelp: string;
+        minReviews: string;
+        minReviewsHelp: string;
+        // Actions
+        close: string;
+    };
     common: {
         required: string;
         error: string;
@@ -173,6 +208,37 @@ const en: Translations = {
         columnWebsite: 'Website',
         columnQuery: 'Query',
     },
+    settings: {
+        title: 'Settings',
+        proxyTitle: 'Proxy',
+        proxyMode: 'Proxy Mode',
+        proxyNone: 'No Proxy',
+        proxyRotating: 'Rotating Proxy',
+        proxySticky: 'Sticky Proxies',
+        proxyRotatingUrl: 'Proxy URL',
+        proxyRotatingPlaceholder: 'http://user:pass@host:port',
+        proxyStickyList: 'Proxy List',
+        proxyStickyPlaceholder: 'http://user:pass@host:port\nOne per line...',
+        proxyStickyHelp: 'One proxy per line',
+        autoSaveTitle: 'Auto Save',
+        autoSaveMode: 'Auto Save Mode',
+        autoSaveOff: 'Off',
+        autoSavePerDistrict: 'Per District',
+        autoSavePerState: 'Per State',
+        autoSavePerCount: 'Per Result Count',
+        autoSaveCount: 'Save Every',
+        autoSaveCountHelp: 'results',
+        filterTitle: 'Data Filters',
+        requirePhone: 'Require Phone',
+        requirePhoneHelp: 'Skip businesses without phone number',
+        requireWebsite: 'Require Website',
+        requireWebsiteHelp: 'Skip businesses without website',
+        minRating: 'Min Rating',
+        minRatingHelp: '0 = disabled',
+        minReviews: 'Min Reviews',
+        minReviewsHelp: '0 = disabled',
+        close: 'Close',
+    },
     common: {
         required: 'Required',
         error: 'Error',
@@ -259,6 +325,37 @@ const tr: Translations = {
         columnCategory: 'Kategori',
         columnWebsite: 'Website',
         columnQuery: 'Sorgu',
+    },
+    settings: {
+        title: 'Ayarlar',
+        proxyTitle: 'Proxy',
+        proxyMode: 'Proxy Modu',
+        proxyNone: 'Proxy Yok',
+        proxyRotating: 'Rotating Proxy',
+        proxySticky: 'Sticky Proxy',
+        proxyRotatingUrl: 'Proxy URL',
+        proxyRotatingPlaceholder: 'http://kullanıcı:şifre@host:port',
+        proxyStickyList: 'Proxy Listesi',
+        proxyStickyPlaceholder: 'http://kullanıcı:şifre@host:port\nHer satıra bir tane...',
+        proxyStickyHelp: 'Her satıra bir proxy',
+        autoSaveTitle: 'Otomatik Kayıt',
+        autoSaveMode: 'Kayıt Modu',
+        autoSaveOff: 'Kapalı',
+        autoSavePerDistrict: 'Her İlçede',
+        autoSavePerState: 'Her İlde',
+        autoSavePerCount: 'Sonuç Sayısına Göre',
+        autoSaveCount: 'Her',
+        autoSaveCountHelp: 'sonuçta kaydet',
+        filterTitle: 'Veri Filtreleri',
+        requirePhone: 'Telefon Zorunlu',
+        requirePhoneHelp: 'Telefon numarası olmayan işletmeleri atla',
+        requireWebsite: 'Website Zorunlu',
+        requireWebsiteHelp: 'Website olmayan işletmeleri atla',
+        minRating: 'Min Puan',
+        minRatingHelp: '0 = devre dışı',
+        minReviews: 'Min Yorum',
+        minReviewsHelp: '0 = devre dışı',
+        close: 'Kapat',
     },
     common: {
         required: 'Zorunlu',

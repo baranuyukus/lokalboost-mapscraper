@@ -1,7 +1,9 @@
 import axios, { AxiosInstance } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import * as cheerio from 'cheerio';
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, app } from 'electron';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 import type { Place, ScraperOptions, SelectedLocation, ScraperProgress } from '../../src/types/scraper';
 
 // ============================================
@@ -386,10 +388,15 @@ class ScraperManager {
     private shouldStop = false;
     private seenFeatureIds = new Set<string>();
     private seenTitles = new Set<string>();
+    private seenPhoneKeys = new Set<string>();  // title+phone dedup
     private totalResults = 0;
     private proxyList: string[] = [];
     private proxyIndex = 0;
     private semaphore!: Semaphore;
+    // Auto-save
+    private allResults: Place[] = [];
+    private lastAutoSaveCount = 0;
+    private currentLabel = '';
 
     setWindow(win: BrowserWindow) { this.win = win; }
 
@@ -405,8 +412,20 @@ class ScraperManager {
         this.shouldStop = false;
         this.seenFeatureIds.clear();
         this.seenTitles.clear();
+        this.seenPhoneKeys.clear();
         this.totalResults = 0;
-        this.proxyList = options.proxyList ?? [];
+        this.allResults = [];
+        this.lastAutoSaveCount = 0;
+        this.currentLabel = '';
+
+        // Proxy setup
+        if (options.proxy.mode === 'rotating' && options.proxy.rotatingProxy) {
+            this.proxyList = [options.proxy.rotatingProxy];
+        } else if (options.proxy.mode === 'sticky' && options.proxy.stickyProxies.length > 0) {
+            this.proxyList = options.proxy.stickyProxies;
+        } else {
+            this.proxyList = [];
+        }
         this.proxyIndex = 0;
         this.semaphore = new Semaphore(options.maxConcurrent);
 
@@ -540,14 +559,21 @@ class ScraperManager {
                 morePlaces = result.morePlaces;
 
                 const unique = result.places.filter(p => {
+                    // Feature ID dedup
                     if (p.feature_id) {
                         if (this.seenFeatureIds.has(p.feature_id)) return false;
                         this.seenFeatureIds.add(p.feature_id);
-                        return true;
                     }
+                    // Title+Address dedup
                     const key = `${p.title}|${p.address}`;
                     if (this.seenTitles.has(key)) return false;
                     this.seenTitles.add(key);
+                    // Title+Phone dedup (güçlendirilmiş)
+                    if (p.phone_number) {
+                        const phoneKey = `${p.title}|${p.phone_number}`;
+                        if (this.seenPhoneKeys.has(phoneKey)) return false;
+                        this.seenPhoneKeys.add(phoneKey);
+                    }
                     return true;
                 });
 
@@ -556,13 +582,22 @@ class ScraperManager {
                     ? unique.filter(p => matchesLocation(p.address, task.filterTerms))
                     : unique;
 
-                if (!filtered.length) {
+                // Veri filtreleme (requirePhone, requireWebsite, minRating, minReviews)
+                const qualityFiltered = filtered.filter(p => {
+                    if (options.filters.requirePhone && !p.phone_number) return false;
+                    if (options.filters.requireWebsite && !p.website) return false;
+                    if (options.filters.minRating > 0 && p.rating_score < options.filters.minRating) return false;
+                    if (options.filters.minReviews > 0 && p.review_count < options.filters.minReviews) return false;
+                    return true;
+                });
+
+                if (!qualityFiltered.length) {
                     if (pageCount >= 3) break;
                     continue;
                 }
 
                 if (options.fetchDetails) {
-                    await Promise.all(filtered.map(async (p) => {
+                    await Promise.all(qualityFiltered.map(async (p) => {
                         if (!p.feature_id) return;
                         try {
                             const d = await client.fetchEntityDetails(p.feature_id);
@@ -571,11 +606,15 @@ class ScraperManager {
                     }));
                 }
 
-                for (const place of filtered) {
+                for (const place of qualityFiltered) {
                     place.query = task.label;
                     this.totalResults++;
+                    this.allResults.push(place);
                     this.win?.webContents.send('scraper:data', place);
                 }
+
+                // Auto-save kontrolü
+                this.checkAutoSave(options, task.label);
 
                 await sleep(120);
             } catch {
@@ -601,6 +640,57 @@ class ScraperManager {
         const proxy = this.proxyList[this.proxyIndex];
         this.proxyIndex = (this.proxyIndex + 1) % this.proxyList.length;
         return proxy;
+    }
+
+    /** Auto-save kontrolü ve CSV yazma */
+    private checkAutoSave(options: ScraperOptions, label: string) {
+        if (options.autoSave.mode === 'off') return;
+
+        let shouldSave = false;
+        let suffix = '';
+
+        if (options.autoSave.mode === 'per-count') {
+            const threshold = options.autoSave.count || 5000;
+            if (this.allResults.length - this.lastAutoSaveCount >= threshold) {
+                shouldSave = true;
+                suffix = `_${this.allResults.length}`;
+            }
+        } else if (options.autoSave.mode === 'per-district' || options.autoSave.mode === 'per-state') {
+            // Label değiştiğinde kaydet (ilçe/il değişimi)
+            if (this.currentLabel && this.currentLabel !== label && this.allResults.length > this.lastAutoSaveCount) {
+                shouldSave = true;
+                suffix = `_${normalizeText(this.currentLabel).replace(/\s+/g, '_')}`;
+            }
+        }
+
+        this.currentLabel = label;
+
+        if (shouldSave) {
+            this.saveCSV(suffix);
+            this.lastAutoSaveCount = this.allResults.length;
+        }
+    }
+
+    /** CSV dosyası kaydet */
+    private saveCSV(suffix: string = '') {
+        try {
+            const date = new Date().toISOString().slice(0, 10);
+            const fileName = `scraper_${date}${suffix}.csv`;
+            const savePath = join(app.getPath('desktop'), fileName);
+
+            const headers = ['Name', 'Address', 'Phone', 'Rating', 'Reviews', 'Category', 'Website', 'URL', 'Query'];
+            const rows = this.allResults.map(p => [
+                p.title, p.address ?? '', p.phone_number ?? '', p.rating_score?.toString(),
+                p.review_count?.toString(), p.category ?? '', p.website ?? '', p.url ?? '', p.query ?? '',
+            ]);
+            const csv = [headers, ...rows].map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            writeFileSync(savePath, '\ufeff' + csv, 'utf-8');
+
+            console.log(`[AutoSave] ${this.allResults.length} results saved to ${savePath}`);
+            this.win?.webContents.send('scraper:autosave', { path: savePath, count: this.allResults.length });
+        } catch (err: any) {
+            console.error(`[AutoSave] Error: ${err.message}`);
+        }
     }
 }
 

@@ -22,9 +22,50 @@ export interface ScraperOptions {
     fetchDetails: boolean;
     maxConcurrent: number;
     maxPages: number;
-    proxyList?: string[];
     /** Seçilen il adı — adres filtreleme için */
     filterState?: string;
+    /** Proxy ayarları */
+    proxy: ProxyConfig;
+    /** Otomatik kayıt ayarları */
+    autoSave: AutoSaveConfig;
+    /** Veri filtreleme */
+    filters: FilterConfig;
+}
+
+/** Proxy yapılandırması */
+export interface ProxyConfig {
+    mode: 'none' | 'rotating' | 'sticky';
+    /** Rotating: tek proxy URL */
+    rotatingProxy: string;
+    /** Sticky: toplu proxy listesi */
+    stickyProxies: string[];
+}
+
+/** Otomatik kayıt yapılandırması */
+export interface AutoSaveConfig {
+    mode: 'off' | 'per-district' | 'per-state' | 'per-count';
+    /** per-count modunda kaç sonuçta kaydet */
+    count: number;
+    /** Kayıt klasörü (varsayılan: Desktop) */
+    savePath: string;
+}
+
+/** Veri filtreleme yapılandırması */
+export interface FilterConfig {
+    requirePhone: boolean;
+    requireWebsite: boolean;
+    minRating: number;    // 0 = devre dışı
+    minReviews: number;   // 0 = devre dışı
+}
+
+/** Tüm uygulama ayarları */
+export interface AppSettings {
+    proxy: ProxyConfig;
+    autoSave: AutoSaveConfig;
+    filters: FilterConfig;
+    fetchDetails: boolean;
+    maxPages: number;
+    maxConcurrent: number;
 }
 
 /** Seçili lokasyon */
