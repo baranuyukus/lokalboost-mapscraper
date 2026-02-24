@@ -134,7 +134,7 @@ const MainPage: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             });
         }
         catch (err: any) { console.error('Start error:', err); }
-    }, [keywordText, fetchDetails, maxConcurrent, maxPages, getSelectedLocations, selectedStateId, selectedCountryId, states]);
+    }, [keywordText, fetchDetails, maxConcurrent, maxPages, getSelectedLocations, selectedStateId, selectedCountryId, states, proxy, autoSave, filters]);
 
     const handleStop = useCallback(async () => {
         try { await window.ipcRenderer.invoke('scraper:stop'); } catch { }
