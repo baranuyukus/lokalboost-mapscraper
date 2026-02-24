@@ -87,13 +87,31 @@ const MainPage: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         if (!keywords.length) return;
         resultsRef.current = [];
         setResults([]);
-        const locations = getSelectedLocations();
-        // Seçili il adını filtre olarak gönder
-        const selectedState = selectedStateId ? states.find(s => s.id === selectedStateId) : null;
-        const filterState = selectedState?.name ?? undefined;
+
+        let locations = getSelectedLocations();
+        let filterState: string | undefined;
+
+        // Ülke seçili ama il seçilmemişse → TÜM ÜLKEYİ TARA
+        if (selectedCountryId && !selectedStateId && locations.length === 0) {
+            try {
+                const allCities: { name: string; lat: number; lng: number; stateName: string }[] =
+                    await window.ipcRenderer.invoke('location:allCities', selectedCountryId);
+                locations = allCities.map(c => ({ name: c.name, lat: c.lat, lng: c.lng }));
+                // Tüm ülke taramasında filterState kullanma (tüm iller gelecek)
+                filterState = undefined;
+                console.log(`[UI] Tüm ülke tarama: ${allCities.length} lokasyon`);
+            } catch (err) {
+                console.error('allCities error:', err);
+            }
+        } else {
+            // İl seçiliyse o ilin adını filtre olarak gönder
+            const selectedState = selectedStateId ? states.find(s => s.id === selectedStateId) : null;
+            filterState = selectedState?.name ?? undefined;
+        }
+
         try { await window.ipcRenderer.invoke('scraper:start', { keywords, locations, fetchDetails, maxConcurrent, maxPages, filterState }); }
         catch (err: any) { console.error('Start error:', err); }
-    }, [keywordText, fetchDetails, maxConcurrent, maxPages, getSelectedLocations, selectedStateId, states]);
+    }, [keywordText, fetchDetails, maxConcurrent, maxPages, getSelectedLocations, selectedStateId, selectedCountryId, states]);
 
     const handleStop = useCallback(async () => {
         try { await window.ipcRenderer.invoke('scraper:stop'); } catch { }

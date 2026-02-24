@@ -112,6 +112,11 @@ class LocationService {
         ipcMain.handle('location:cities', (_, countryId: number, stateId: number) => {
             return this.getCities(countryId, stateId);
         });
+
+        // Tüm ülke tarama: ülkedeki tüm şehirleri döndür
+        ipcMain.handle('location:allCities', (_, countryId: number) => {
+            return this.getAllCitiesForCountry(countryId);
+        });
     }
 
     /** Ülke listesi */
@@ -153,6 +158,34 @@ class LocationService {
             lat: parseFloat(c.latitude) || 0,
             lng: parseFloat(c.longitude) || 0,
         })).sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    /** Ülkedeki TÜM illerin şehirlerini döndür (tüm ülke tarama için) */
+    getAllCitiesForCountry(countryId: number): { name: string; lat: number; lng: number; stateName: string }[] {
+        const country = this.data.find(c => c.id === countryId);
+        if (!country) return [];
+
+        const allCities: { name: string; lat: number; lng: number; stateName: string }[] = [];
+
+        for (const state of (country.states ?? [])) {
+            // İl merkezini ekle
+            const stateLat = parseFloat(state.latitude) || 0;
+            const stateLng = parseFloat(state.longitude) || 0;
+            if (stateLat && stateLng) {
+                allCities.push({ name: state.name, lat: stateLat, lng: stateLng, stateName: state.name });
+            }
+
+            // İlçeleri ekle
+            for (const city of (state.cities ?? [])) {
+                const lat = parseFloat(city.latitude) || 0;
+                const lng = parseFloat(city.longitude) || 0;
+                if (lat && lng) {
+                    allCities.push({ name: city.name, lat, lng, stateName: state.name });
+                }
+            }
+        }
+
+        return allCities;
     }
 }
 

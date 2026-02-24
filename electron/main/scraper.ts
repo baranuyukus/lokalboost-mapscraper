@@ -263,6 +263,7 @@ class GoogleEarthClient {
                     phone_number: card.phone_number ?? null,
                     feature_id: card.feature_id ?? null,
                     url, rating_score, review_count,
+                    website: url,  // search sonucundan gelen URL = işletme website'i
                 });
             }
             return { places, morePlaces };
@@ -297,8 +298,17 @@ class GoogleEarthClient {
             if (hours.length) details.working_hours = hours;
         }
 
-        const websiteLink = $('a').filter(function () { return /Web sitesi|Website/i.test($(this).text()); });
-        if (websiteLink.length) details.website = websiteLink.attr('href') ?? null;
+        const websiteLink = $('a').filter(function () { return /Web sitesi|Website|Siteyi ziyaret|Visit site/i.test($(this).text()); });
+        if (websiteLink.length) {
+            details.website = websiteLink.attr('href') ?? null;
+        } else {
+            // Fallback: authority_page class'ından bul
+            const authorityLink = $('a.authority_page_link, a[data-url], a.ab_button').filter(function () {
+                const href = $(this).attr('href') ?? '';
+                return href.startsWith('http') && !href.includes('google.com');
+            });
+            if (authorityLink.length) details.website = authorityLink.first().attr('href') ?? null;
+        }
 
         return details;
     }
