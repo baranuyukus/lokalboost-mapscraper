@@ -374,7 +374,7 @@ function jitterCoords(lat: number, lng: number, offset = 0.02): { lat: number; l
     ];
 }
 
-const SEARCH_RADII = ['5000', '15000'];
+const SEARCH_RADII = ['5000', '10000'];
 
 // ============================================
 // Scraper Manager
@@ -607,14 +607,28 @@ class ScraperManager {
                     return true;
                 });
 
-                // Adres filtreleme — SADECE metin tabanlı (koordinatsız) aramalarda uygula
-                // Koordinat bazlı aramalarda (lat/lng var) filtre ATLANIR çünkü:
-                // 1) Koordinatlar zaten doğru bölgeyi hedefliyor
-                // 2) Farklı dillerdeki adresler (Girne vs Kyrenia) yanlış filtrelenebilir
-                const shouldFilterAddress = !task.lat && !task.lng && task.filterTerms.length > 0;
-                const filtered = shouldFilterAddress
-                    ? unique.filter(p => matchesLocation(p.address, task.filterTerms))
-                    : unique;
+                // Adres filtreleme — akıllı hibrit sistem:
+                // TEXT tabanlı (koordinatsız): tam filterTerms ile kesin filtre
+                // KOORDINAT tabanlı: sadece state (il) seviyesinde gevşetilmiş filtre
+                // → Türkiye: il filtresi çalışır (İstanbul vs Ankara ayırır)
+                // → Kıbrıs: "Kyrenia" vs "Girne" sorunu oluşmaz (ilçe filtresi devre dışı)
+                let filtered: Place[];
+                if (!task.lat && !task.lng && task.filterTerms.length > 0) {
+                    // TEXT arama: tam filtre (il + ilçe)
+                    filtered = unique.filter(p => matchesLocation(p.address, task.filterTerms));
+                } else if (task.lat && task.lng && options.filterState) {
+                    // KOORDINAT arama: sadece il (state) seviyesinde gevşetilmiş filtre
+                    const stateTerms = [normalizeText(options.filterState)];
+                    // State isminin ilk kelimesini de ekle (örn: "Kyrenia (Keryneia)" → "kyrenia")
+                    const firstWord = normalizeText(options.filterState).split(/[\s(,]+/)[0];
+                    if (firstWord.length >= 3 && !stateTerms.includes(firstWord)) stateTerms.push(firstWord);
+                    const matches = unique.filter(p => matchesLocation(p.address, stateTerms));
+                    // Eğer state filtresi hiçbir sonuç bulamazsa (dil uyumsuzluğu),
+                    // koordinat + radius güvenine bırak (tüm sonuçları kabul et)
+                    filtered = matches.length > 0 ? matches : unique;
+                } else {
+                    filtered = unique;
+                }
 
                 // Veri filtreleme (requirePhone, requireWebsite, minRating, minReviews)
                 const qualityFiltered = filtered.filter(p => {
