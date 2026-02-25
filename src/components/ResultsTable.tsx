@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { Place } from '../types/scraper';
 import { useLanguage } from '../LanguageContext';
+import * as XLSX from 'xlsx';
 
 interface ResultsTableProps {
     results: Place[];
@@ -25,7 +26,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results, showDetails }) => 
 
     // Export state
     const [showExport, setShowExport] = useState(false);
-    const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+    const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'json'>('xlsx');
     const [exportFileName, setExportFileName] = useState(`scraper_${new Date().toISOString().slice(0, 10)}`);
     const [exportColumns, setExportColumns] = useState({
         title: true, address: true, phone_number: true, rating_score: true,
@@ -122,28 +123,54 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results, showDetails }) => 
             review_count: 'Reviews', category: 'Category', website: 'Website', url: 'URL', query: 'Query',
         };
 
-        let content: string;
-        let mimeType: string;
+        let content: string | ArrayBuffer;
         let ext: string;
 
-        if (exportFormat === 'json') {
+        if (exportFormat === 'xlsx') {
+            // XLSX export via SheetJS
+            const headers = cols.map(c => headerMap[c]);
+            const rows = dataSet.map(p => {
+                const row: Record<string, any> = {};
+                cols.forEach(c => {
+                    const key = headerMap[c];
+                    const val = (p as any)[c];
+                    row[key] = val ?? '';
+                });
+                return row;
+            });
+            const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+            ws['!cols'] = cols.map(c => ({
+                wch: c === 'address' || c === 'url' ? 40 : c === 'title' || c === 'website' ? 30 : c === 'phone_number' ? 18 : 12,
+            }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Results');
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${exportFileName}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+            setShowExport(false);
+            return;
+        } else if (exportFormat === 'json') {
             const jsonData = dataSet.map(p => {
                 const obj: Record<string, any> = {};
                 cols.forEach(c => { obj[headerMap[c]] = (p as any)[c] ?? ''; });
                 return obj;
             });
             content = JSON.stringify(jsonData, null, 2);
-            mimeType = 'application/json';
             ext = 'json';
         } else {
             const headers = cols.map(c => headerMap[c]);
             const rows = dataSet.map(p => cols.map(c => `"${String((p as any)[c] ?? '').replace(/"/g, '""')}"`).join(','));
             content = '\ufeff' + [headers.join(','), ...rows].join('\n');
-            mimeType = 'text/csv;charset=utf-8;';
             ext = 'csv';
         }
 
-        const blob = new Blob([content], { type: mimeType });
+        const mimeType = ext === 'json' ? 'application/json' : 'text/csv;charset=utf-8;';
+        const blob = new Blob([content as string], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -352,7 +379,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results, showDetails }) => 
                         <div style={{ marginBottom: 12 }}>
                             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t.dataTable.exportFormat}</label>
                             <div style={{ display: 'flex', gap: 6 }}>
-                                {(['csv', 'json'] as const).map(fmt => (
+                                {(['xlsx', 'csv', 'json'] as const).map(fmt => (
                                     <span key={fmt} style={chipStyle(exportFormat === fmt)} onClick={() => setExportFormat(fmt)}>
                                         {fmt.toUpperCase()}
                                     </span>

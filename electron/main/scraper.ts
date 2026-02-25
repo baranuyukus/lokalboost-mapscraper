@@ -5,6 +5,7 @@ import { ipcMain, BrowserWindow, app, dialog } from 'electron';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import * as XLSX from 'xlsx';
 import type { Place, ScraperOptions, SelectedLocation, ScraperProgress } from '../../src/types/scraper';
 
 // ============================================
@@ -702,26 +703,41 @@ class ScraperManager {
         this.currentLabel = label;
 
         if (shouldSave) {
-            this.saveCSV(suffix, options.autoSave.savePath);
+            this.saveFile(suffix, options.autoSave.savePath);
             this.lastAutoSaveCount = this.allResults.length;
         }
     }
 
-    /** CSV dosyası kaydet */
-    private saveCSV(suffix: string = '', savePath?: string) {
+    /** XLSX dosyası kaydet */
+    private saveFile(suffix: string = '', savePath?: string) {
         try {
             const date = new Date().toISOString().slice(0, 10);
-            const fileName = `scraper_${date}${suffix}.csv`;
+            const fileName = `scraper_${date}${suffix}.xlsx`;
             const dir = savePath && savePath.trim() ? savePath.trim() : app.getPath('desktop');
             const fullPath = join(dir, fileName);
 
             const headers = ['Name', 'Address', 'Phone', 'Rating', 'Reviews', 'Category', 'Website', 'URL', 'Query'];
             const rows = this.allResults.map(p => [
-                p.title, p.address ?? '', p.phone_number ?? '', p.rating_score?.toString(),
-                p.review_count?.toString(), p.category ?? '', p.website ?? '', p.url ?? '', p.query ?? '',
+                p.title, p.address ?? '', p.phone_number ?? '', p.rating_score ?? 0,
+                p.review_count ?? 0, p.category ?? '', p.website ?? '', p.url ?? '', p.query ?? '',
             ]);
-            const csv = [headers, ...rows].map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-            writeFileSync(fullPath, '\ufeff' + csv, 'utf-8');
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+            // Sütun genişliklerini ayarla
+            ws['!cols'] = [
+                { wch: 30 }, // Name
+                { wch: 40 }, // Address
+                { wch: 18 }, // Phone
+                { wch: 8 },  // Rating
+                { wch: 10 }, // Reviews
+                { wch: 20 }, // Category
+                { wch: 30 }, // Website
+                { wch: 40 }, // URL
+                { wch: 20 }, // Query
+            ];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Results');
+            XLSX.writeFile(wb, fullPath);
 
             console.log(`[AutoSave] ${this.allResults.length} results saved to ${fullPath}`);
             this.win?.webContents.send('scraper:autosave', { path: fullPath, count: this.allResults.length });
