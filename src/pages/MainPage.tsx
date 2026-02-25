@@ -128,13 +128,15 @@ const MainPage: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         }
 
         try {
+            const selectedCountry = selectedCountryId ? countries.find(c => c.id === selectedCountryId) : null;
             await window.ipcRenderer.invoke('scraper:start', {
                 keywords, locations, fetchDetails, maxConcurrent, maxPages, filterState,
+                countryCode: selectedCountry?.iso2?.toLowerCase(),
                 proxy, autoSave, filters,
             });
         }
         catch (err: any) { console.error('Start error:', err); }
-    }, [keywordText, fetchDetails, maxConcurrent, maxPages, getSelectedLocations, selectedStateId, selectedCountryId, states, proxy, autoSave, filters]);
+    }, [keywordText, fetchDetails, maxConcurrent, maxPages, getSelectedLocations, selectedStateId, selectedCountryId, states, countries, proxy, autoSave, filters]);
 
     const handleStop = useCallback(async () => {
         try { await window.ipcRenderer.invoke('scraper:stop'); } catch { }

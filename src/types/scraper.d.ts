@@ -24,6 +24,8 @@ export interface ScraperOptions {
     maxPages: number;
     /** Seçilen il adı — adres filtreleme için */
     filterState?: string;
+    /** Seçilen ülkenin ISO2 kodu (örn: TR, CY, DE) — gl parametresi için */
+    countryCode?: string;
     /** Proxy ayarları */
     proxy: ProxyConfig;
     /** Otomatik kayıt ayarları */

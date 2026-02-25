@@ -366,23 +366,15 @@ function buildQueryVariants(keyword: string, locName: string): string[] {
     ];
 }
 
-function jitterCoords(lat: number, lng: number, offset = 0.015): { lat: number; lng: number }[] {
+function jitterCoords(lat: number, lng: number, offset = 0.02): { lat: number; lng: number }[] {
     return [
         { lat, lng },
-        { lat: lat + offset, lng },
-        { lat: lat - offset, lng },
-        { lat, lng: lng + offset },
-        { lat, lng: lng - offset },
         { lat: lat + offset, lng: lng + offset },
         { lat: lat - offset, lng: lng - offset },
     ];
 }
 
-const SEARCH_RADII = ['2000', '5000', '10000', '20000'];
-const SEARCH_LANGS: { hl: string; gl: string }[] = [
-    { hl: 'tr', gl: 'tr' },
-    { hl: 'en', gl: 'en' },
-];
+const SEARCH_RADII = ['5000', '15000'];
 
 // ============================================
 // Scraper Manager
@@ -522,6 +514,10 @@ class ScraperManager {
     private buildTasks(options: ScraperOptions): ScrapeTask[] {
         const tasks: ScrapeTask[] = [];
 
+        // Ülke ISO kodunu gl parametresi olarak kullan (ör: cy, tr, de)
+        const gl = options.countryCode || 'en';
+        console.log(`[Scraper] Using gl=${gl} for Google API geolocation`);
+
         // Filtre terimleri: seçilen il + tüm lokasyon isimleri
         const buildFilterTerms = (locName?: string): string[] => {
             const terms: string[] = [];
@@ -532,7 +528,7 @@ class ScraperManager {
 
         for (const keyword of options.keywords) {
             if (options.locations.length === 0) {
-                tasks.push({ query: keyword, label: keyword, lat: null, lng: null, radius: undefined, hl: 'en', gl: 'en', filterTerms: [] });
+                tasks.push({ query: keyword, label: keyword, lat: null, lng: null, radius: undefined, hl: 'en', gl: gl, filterTerms: [] });
                 continue;
             }
 
@@ -541,21 +537,18 @@ class ScraperManager {
                 const filterTerms = buildFilterTerms(loc.name);
 
                 // 1) Metin varyasyonları (koordinatsız)
-                for (const v of buildQueryVariants(keyword, loc.name)) {
-                    tasks.push({ query: v, label, lat: null, lng: null, radius: undefined, hl: 'en', gl: 'en', filterTerms });
-                }
+                tasks.push({ query: `${keyword} ${loc.name}`, label, lat: null, lng: null, radius: undefined, hl: 'en', gl: gl, filterTerms });
+                tasks.push({ query: `${keyword} in ${loc.name}`, label, lat: null, lng: null, radius: undefined, hl: 'en', gl: gl, filterTerms });
 
-                // 2) Koordinatlı: radius × dil × jitter
+                // 2) Koordinatlı: radius × jitter
                 const jitters = jitterCoords(loc.lat, loc.lng);
-                for (const lang of SEARCH_LANGS) {
-                    for (const radius of SEARCH_RADII) {
-                        for (const point of jitters) {
-                            tasks.push({
-                                query: keyword, label,
-                                lat: point.lat, lng: point.lng,
-                                radius, hl: lang.hl, gl: lang.gl, filterTerms,
-                            });
-                        }
+                for (const radius of SEARCH_RADII) {
+                    for (const point of jitters) {
+                        tasks.push({
+                            query: keyword, label,
+                            lat: point.lat, lng: point.lng,
+                            radius, hl: 'en', gl: gl, filterTerms,
+                        });
                     }
                 }
             }
