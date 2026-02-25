@@ -20,7 +20,14 @@
     },
     "files": [
       "dist",
-      "dist-electron"
+      "dist-electron",
+      "countries+states+cities.json"
+    ],
+    "extraResources": [
+      {
+        "from": "countries+states+cities.json",
+        "to": "countries+states+cities.json"
+      }
     ],
     "asar": true,
     "mac": {

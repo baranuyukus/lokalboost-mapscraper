@@ -1,6 +1,6 @@
-import { ipcMain } from 'electron';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { ipcMain, app } from 'electron';
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
 
 // ============================================
 // Veri Tipleri
@@ -66,25 +66,38 @@ class LocationService {
     load(appPath: string) {
         if (this.loaded) return;
 
+        const fileName = 'countries+states+cities.json';
+
         try {
-            // Dosya konumunu kontrol et
+            // Packaged ve dev ortamlarını kapsayan genişletilmiş path listesi
             const possiblePaths = [
-                join(appPath, 'countries+states+cities.json'),
-                join(process.cwd(), 'countries+states+cities.json'),
-                join(__dirname, '../../countries+states+cities.json'),
+                join(appPath, fileName),
+                join(process.cwd(), fileName),
+                join(__dirname, '../../', fileName),
+                // Packaged app (extraResources)
+                join(process.resourcesPath || '', fileName),
+                // App path'ten türetilmiş
+                join(app.getAppPath(), fileName),
+                join(app.getAppPath(), '..', fileName),
+                // Exe dizini (Windows)
+                join(dirname(process.execPath), fileName),
+                join(dirname(process.execPath), 'resources', fileName),
             ];
 
             let rawData: string | null = null;
             for (const p of possiblePaths) {
                 try {
-                    rawData = readFileSync(p, 'utf-8');
-                    console.log(`[Location] Loaded from: ${p}`);
-                    break;
+                    if (existsSync(p)) {
+                        rawData = readFileSync(p, 'utf-8');
+                        console.log(`[Location] Loaded from: ${p}`);
+                        break;
+                    }
                 } catch { /* try next */ }
             }
 
             if (!rawData) {
-                console.error('[Location] countries+states+cities.json not found!');
+                console.error('[Location] countries+states+cities.json not found! Searched paths:');
+                possiblePaths.forEach(p => console.error(`  - ${p} (exists: ${existsSync(p)})`));
                 return;
             }
 
