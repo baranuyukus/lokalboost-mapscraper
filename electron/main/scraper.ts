@@ -607,8 +607,12 @@ class ScraperManager {
                     return true;
                 });
 
-                // Adres filtreleme — seçilen il/ilçeyle eşleşmeyen sonuçları at
-                const filtered = task.filterTerms.length > 0
+                // Adres filtreleme — SADECE metin tabanlı (koordinatsız) aramalarda uygula
+                // Koordinat bazlı aramalarda (lat/lng var) filtre ATLANIR çünkü:
+                // 1) Koordinatlar zaten doğru bölgeyi hedefliyor
+                // 2) Farklı dillerdeki adresler (Girne vs Kyrenia) yanlış filtrelenebilir
+                const shouldFilterAddress = !task.lat && !task.lng && task.filterTerms.length > 0;
+                const filtered = shouldFilterAddress
                     ? unique.filter(p => matchesLocation(p.address, task.filterTerms))
                     : unique;
 
