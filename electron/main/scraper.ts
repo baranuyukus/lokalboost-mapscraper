@@ -265,13 +265,46 @@ class GoogleEarthClient {
                     review_count = parseInt(String(ratingObj.review_count.anchor_text).split(' ')[0].replace(/,/g, '')) || 0;
                 }
 
+                // İşletme koordinatlarını al (center, coordinates, LookAt)
+                let placeLat: number | null = null;
+                let placeLng: number | null = null;
+                if (card.center) {
+                    placeLat = parseFloat(card.center['@_lat'] ?? card.center.lat) || null;
+                    placeLng = parseFloat(card.center['@_lng'] ?? card.center.lng ?? card.center['@_lon'] ?? card.center.lon) || null;
+                }
+                if (!placeLat && card.coordinates) {
+                    const coords = String(card.coordinates).split(',');
+                    if (coords.length >= 2) {
+                        placeLng = parseFloat(coords[0]) || null;
+                        placeLat = parseFloat(coords[1]) || null;
+                    }
+                }
+                if (!placeLat && card.LookAt) {
+                    placeLat = parseFloat(card.LookAt.latitude) || null;
+                    placeLng = parseFloat(card.LookAt.longitude) || null;
+                }
+                // entry-level fallback (Placemarks vb.)
+                if (!placeLat && entry?.LookAt) {
+                    placeLat = parseFloat(entry.LookAt.latitude) || null;
+                    placeLng = parseFloat(entry.LookAt.longitude) || null;
+                }
+                if (!placeLat && entry?.Point?.coordinates) {
+                    const coords = String(entry.Point.coordinates).split(',');
+                    if (coords.length >= 2) {
+                        placeLng = parseFloat(coords[0]) || null;
+                        placeLat = parseFloat(coords[1]) || null;
+                    }
+                }
+
                 places.push({
                     title: card.title ?? '',
                     address,
                     phone_number: card.phone_number ?? null,
                     feature_id: card.feature_id ?? null,
                     url, rating_score, review_count,
-                    website: url,  // search sonucundan gelen URL = işletme website'i
+                    website: url,
+                    latitude: placeLat,
+                    longitude: placeLng,
                 });
             }
             return { places, morePlaces };
@@ -349,11 +382,23 @@ function normalizeText(text: string): string {
 
 /** Adresin seçili il/ilçeye ait olup olmadığını kontrol et */
 function matchesLocation(address: string | null, filterTerms: string[]): boolean {
-    if (!filterTerms.length) return true; // filtre yoksa hepsini kabul et
-    if (!address) return false; // adres yoksa reddet
+    if (!filterTerms.length) return true;
+    if (!address) return false;
     const normalized = normalizeText(address);
     return filterTerms.some(term => normalized.includes(term));
 }
+
+/** Haversine formülü ile iki koordinat arası mesafe (km) */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // Dünya yarıçapı km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Maksimum mesafe filtresi (km) — koordinat aramaları için */
+const MAX_DISTANCE_KM = 30;
 
 function buildQueryVariants(keyword: string, locName: string): string[] {
     return [
@@ -607,25 +652,28 @@ class ScraperManager {
                     return true;
                 });
 
-                // Adres filtreleme — akıllı hibrit sistem:
-                // TEXT tabanlı (koordinatsız): tam filterTerms ile kesin filtre
-                // KOORDINAT tabanlı: sadece state (il) seviyesinde gevşetilmiş filtre
-                // → Türkiye: il filtresi çalışır (İstanbul vs Ankara ayırır)
-                // → Kıbrıs: "Kyrenia" vs "Girne" sorunu oluşmaz (ilçe filtresi devre dışı)
+                // MESAFE + ADRES HİBRİT FİLTRE SİSTEMİ:
+                // 1) KOORDINAT arama (lat/lng var): İşletme koordinatı mevcutsa → mesafe filtresi
+                //    İşletme koordinatı yoksa → adres bazlı fallback (il seviyesi)
+                // 2) TEXT arama (koordinatsız): tam adres filtresi (il+ilçe)
                 let filtered: Place[];
-                if (!task.lat && !task.lng && task.filterTerms.length > 0) {
-                    // TEXT arama: tam filtre (il + ilçe)
+                if (task.lat && task.lng) {
+                    // KOORDİNAT ARAMA: mesafe bazlı filtre (dil bağımsız!)
+                    filtered = unique.filter(p => {
+                        if (p.latitude && p.longitude) {
+                            // İşletme koordinatı var → mesafe hesapla
+                            const dist = haversineKm(task.lat!, task.lng!, p.latitude, p.longitude);
+                            return dist <= MAX_DISTANCE_KM;
+                        }
+                        // İşletme koordinatı yok → adres bazlı fallback (il seviyesi)
+                        if (options.filterState) {
+                            return matchesLocation(p.address, [normalizeText(options.filterState)]);
+                        }
+                        return true; // ne koordinat ne filtre var → kabul et
+                    });
+                } else if (task.filterTerms.length > 0) {
+                    // TEXT ARAMA: tam adres filtresi (il + ilçe)
                     filtered = unique.filter(p => matchesLocation(p.address, task.filterTerms));
-                } else if (task.lat && task.lng && options.filterState) {
-                    // KOORDINAT arama: sadece il (state) seviyesinde gevşetilmiş filtre
-                    const stateTerms = [normalizeText(options.filterState)];
-                    // State isminin ilk kelimesini de ekle (örn: "Kyrenia (Keryneia)" → "kyrenia")
-                    const firstWord = normalizeText(options.filterState).split(/[\s(,]+/)[0];
-                    if (firstWord.length >= 3 && !stateTerms.includes(firstWord)) stateTerms.push(firstWord);
-                    const matches = unique.filter(p => matchesLocation(p.address, stateTerms));
-                    // Eğer state filtresi hiçbir sonuç bulamazsa (dil uyumsuzluğu),
-                    // koordinat + radius güvenine bırak (tüm sonuçları kabul et)
-                    filtered = matches.length > 0 ? matches : unique;
                 } else {
                     filtered = unique;
                 }
