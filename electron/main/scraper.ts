@@ -653,8 +653,8 @@ class ScraperManager {
                 });
 
                 // MESAFE + ADRES HİBRİT FİLTRE SİSTEMİ:
-                // 1) KOORDINAT arama (lat/lng var): İşletme koordinatı mevcutsa → mesafe filtresi
-                //    İşletme koordinatı yoksa → adres bazlı fallback (il seviyesi)
+                // 1) KOORDINAT arama: işletme koordinatı varsa → mesafe filtresi
+                //    İşletme koordinatı yoksa → KABUL ET (Google radius zaten doğru bölge)
                 // 2) TEXT arama (koordinatsız): tam adres filtresi (il+ilçe)
                 let filtered: Place[];
                 if (task.lat && task.lng) {
@@ -665,11 +665,8 @@ class ScraperManager {
                             const dist = haversineKm(task.lat!, task.lng!, p.latitude, p.longitude);
                             return dist <= MAX_DISTANCE_KM;
                         }
-                        // İşletme koordinatı yok → adres bazlı fallback (il seviyesi)
-                        if (options.filterState) {
-                            return matchesLocation(p.address, [normalizeText(options.filterState)]);
-                        }
-                        return true; // ne koordinat ne filtre var → kabul et
+                        // İşletme koordinatı yok → Google'ın radius aramasına güven
+                        return true;
                     });
                 } else if (task.filterTerms.length > 0) {
                     // TEXT ARAMA: tam adres filtresi (il + ilçe)
