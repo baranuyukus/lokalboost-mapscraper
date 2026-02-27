@@ -665,7 +665,18 @@ class ScraperManager {
                             const dist = haversineKm(task.lat!, task.lng!, p.latitude, p.longitude);
                             return dist <= MAX_DISTANCE_KM;
                         }
-                        // İşletme koordinatı yok → Google'ın radius aramasına güven
+                        // İşletme koordinatı yok → Adres bazlı (gevşetilmiş) fallback uygula.
+                        // Çünkü Google uzak veya alakasız "sponsorlu" işletmeleri koordinatsız döndürebilir!
+                        if (options.filterState) {
+                            const stateTerms = [normalizeText(options.filterState)];
+                            const firstWord = normalizeText(options.filterState).split(/[\s(,]+/)[0];
+                            if (firstWord.length >= 3 && !stateTerms.includes(firstWord)) stateTerms.push(firstWord);
+
+                            const matched = matchesLocation(p.address, stateTerms);
+                            // Kıbrıs'ta adres dilleri (Girne/Kyrenia) uyuşmadığı için esneklik sağlıyoruz
+                            if (!matched && options.countryCode?.toLowerCase() === 'cy') return true;
+                            return matched;
+                        }
                         return true;
                     });
                 } else if (task.filterTerms.length > 0) {
@@ -690,13 +701,15 @@ class ScraperManager {
                 }
 
                 if (options.fetchDetails) {
-                    await Promise.all(qualityFiltered.map(async (p) => {
-                        if (!p.feature_id) return;
+                    for (const p of qualityFiltered) {
+                        if (this.shouldStop) break; // Stop'a anında tepki
+                        if (!p.feature_id) continue;
                         try {
                             const d = await client.fetchEntityDetails(p.feature_id);
                             if (d) Object.assign(p, d);
                         } catch { }
-                    }));
+                        await new Promise(r => setTimeout(r, 25)); // Rate limiting / donmayı önler
+                    }
                 }
 
                 for (const place of qualityFiltered) {
